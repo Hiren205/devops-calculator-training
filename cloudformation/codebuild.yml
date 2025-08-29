@@ -1,0 +1,68 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CodeBuild project for packaging Lambda
+
+Parameters:
+  ProjectName:
+    Type: String
+  DeploymentBucket:
+    Type: String
+  CodeBuildServiceRoleArn:
+    Type: String
+
+Resources:
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub "${ProjectName}-Lambda-Build"
+      ServiceRole: !Ref CodeBuildServiceRoleArn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        Type: LINUX_CONTAINER
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspec.yml
+      TimeoutInMinutes: 10
+
+  LambdaDeployProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub "${ProjectName}-LambdaDeploy"
+      Description: "CodeBuild project to deploy Lambda function"
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: |
+          version: 0.2
+
+          phases:
+            install:
+              runtime-versions:
+                nodejs: 22
+            build:
+              commands:
+                - echo "Current working directory $(pwd)"
+                - echo "Listing all files in current directory"
+                - ls -al
+                - LAMBDA_FUNCTION_NAME=calculator-Lambda
+                - echo "Deploying Lambda function $LAMBDA_FUNCTION_NAME..."
+                - aws lambda update-function-code --function-name $LAMBDA_FUNCTION_NAME --zip-file fileb://lambda.zip                   
+          artifacts:
+            files:
+              - '**/*'
+      Artifacts:
+        Type: CODEPIPELINE              
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        EnvironmentVariables:
+          - Name: PROJECT_NAME
+            Value: !Ref ProjectName
+      ServiceRole: !Ref CodeBuildServiceRoleArn
+      
+
+Outputs:
+  CodeBuildProjectName:
+    Value: !Ref CodeBuildProject

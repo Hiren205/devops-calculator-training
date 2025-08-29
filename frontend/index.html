@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Letter Calculator</title>
+</head>
+<body>
+  <!-- Point action to your Lambda/API Gateway URL -->
+  <form action="https://7u7j3cq9yd.execute-api.us-east-1.amazonaws.com/prod/lambda" method="get">
+    <label for="word">Enter text:</label>
+    <!-- name must be "word" so it maps to queryStringParameters.word -->
+    <input type="text" id="word" name="word" />
+    <button type="submit">Submit</button>
+  </form>
+</body>
+</html>
+

@@ -1,0 +1,102 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Lambda function deployment with API Gateway using Node.js 22
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: MyApp
+    Description: Project name to prefix resources
+  DeploymentBucket:
+    Type: String
+    Description: S3 bucket where CodeBuild uploads lambda.zip
+    Default: "deployment-bucket"
+
+Resources:
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-LambdaExecutionRole"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  MyLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-Lambda"
+      Handler: app.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: nodejs22.x
+      Code:
+        ZipFile: |
+          exports.handler = async (event) => {
+              return {
+                  statusCode: 200,
+                  body: "Hello World!"
+              };
+          };
+
+  # === API Gateway Setup ===
+  ApiGatewayRestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub "${ProjectName}-Api"
+      Description: API Gateway for Lambda function
+
+  ApiGatewayResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: "lambda"
+      RestApiId: !Ref ApiGatewayRestApi
+
+  ApiGatewayMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref ApiGatewayResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri:
+          Fn::Sub:
+            - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
+            - { LambdaArn: !GetAtt MyLambdaFunction.Arn }
+
+  LambdaApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref MyLambdaFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/*"
+
+  ApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: ApiGatewayMethod
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      StageName: prod
+
+Outputs:
+  LambdaFunctionName:
+    Description: Name of the deployed Lambda function
+    Value: !Ref MyLambdaFunction
+
+  LambdaFunctionArn:
+    Description: ARN of the deployed Lambda function
+    Value: !GetAtt MyLambdaFunction.Arn
+
+  ApiGatewayInvokeUrl:
+    Description: Invoke URL of API Gateway
+    Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/prod/lambda"

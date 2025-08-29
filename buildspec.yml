@@ -1,0 +1,17 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 22
+  build:
+    commands:
+      - echo "Uploading frontend index.html to S3..."
+      - aws s3 cp frontend/index.html s3://calculator-static-frontend-file/index.html
+      - echo "Zipping Lambda source..."
+      - cd lambda
+      - zip -r ../lambda.zip app.js   # create in root
+artifacts:
+  files:
+    - lambda.zip
+  discard-paths: yes
