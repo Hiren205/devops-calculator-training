@@ -8,7 +8,6 @@ Parameters:
   GitHubRepo:
     Type: String
     Default: Hiren205/devops-calculator-training
-
   GitHubBranch:
     Type: String
     Default: main
@@ -59,7 +58,7 @@ Resources:
       TemplateURL: https://s3.amazonaws.com/calculator-first-cicd-bucket/pipeline.yml
       Parameters:
         ProjectName: !Ref ProjectName
-        GitHubRepo: !Ref GitHubRepo
+        GitHubRepo: !Ref GitHubRepo 
         GitHubBranch: !Ref GitHubBranch
         GitHubToken: !Sub "{{resolve:ssm:${GitHubToken}}}"
         ArtifactBucket: !Ref DeploymentBucket
