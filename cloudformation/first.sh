@@ -13,15 +13,15 @@ done
  
 #Now deploy the main stack
 
-aws cloudformation create-stack \
-  --stack-name main-stack \
-  --template-body file://main.yml \
-  --capabilities CAPABILITY_NAMED_IAM
-
-# aws cloudformation update-stack \
+# aws cloudformation create-stack \
 #   --stack-name main-stack \
 #   --template-body file://main.yml \
 #   --capabilities CAPABILITY_NAMED_IAM
+
+aws cloudformation update-stack \
+  --stack-name main-stack \
+  --template-body file://main.yml \
+  --capabilities CAPABILITY_NAMED_IAM
   
 
 aws cloudformation wait stack-update-complete \
@@ -35,4 +35,4 @@ WS_URL=$(aws cloudformation describe-stacks \
 # Replace placeholder in index.html locally
 sed -i "s|wss://<api-id>.execute-api.<region>.amazonaws.com/dev|$WS_URL|g" index.html
 
-aws s3 cp index.html s3://calculator-static-frontend-file/index.html
+aws s3 cp index.html s3://calculator-static-frontend-file-458284369197/index.html
