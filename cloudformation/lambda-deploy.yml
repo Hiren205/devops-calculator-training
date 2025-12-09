@@ -224,6 +224,13 @@ Resources:
       FunctionName: !Ref LogProcessorLambda
       Action: lambda:InvokeFunction
       Principal: logs.amazonaws.com
+  LambdaPermissionDisconnect:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ConnectHandler
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/$disconnect"
 Outputs:
   WebSocketUrl:
     Description: WebSocket URL to use in the frontend (use wss://)
