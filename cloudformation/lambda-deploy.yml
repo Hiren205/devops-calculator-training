@@ -66,7 +66,6 @@ Resources:
     Properties:
       Name: !Sub "${ProjectName}-realtime-ws"
       ProtocolType: WEBSOCKET
-      RouteSelectionExpression: "$request.body.action"
   ConnectIntegration:
     Type: AWS::ApiGatewayV2::Integration
     Properties:
