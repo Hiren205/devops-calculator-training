@@ -12,7 +12,7 @@ Parameters:
     Type: String
     Default: main
   GitHubToken:
-    Type: AWS::SSM::Parameter::Value<SecureString>
+    Type: AWS::SSM::Parameter::Value<String>
     Default: github-token
   EC2KeyPair:
     Type: String
