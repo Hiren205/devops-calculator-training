@@ -134,6 +134,13 @@ Resources:
             }
             return { statusCode: 200 };
           };
+  WebSocketStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      StageName: dev           # your stage name
+      ApiId: !Ref WebSocketApi
+      DeploymentId: !Ref WebSocketDeployment
+      AutoDeploy: true
   LambdaPermissionForAPIGW:
     Type: AWS::Lambda::Permission
     Properties:
