@@ -167,9 +167,9 @@ Resources:
           const zlib = require('zlib');
           const AWS = require('aws-sdk');
           const ddb = new AWS.DynamoDB.DocumentClient();
-const apiGateway = new AWS.ApiGatewayManagementApi({
-  endpoint: process.env.WS_API_ENDPOINT
-});
+           const apiGateway = new AWS.ApiGatewayManagementApi({
+              endpoint: process.env.WS_API_ENDPOINT
+                        });
 
           const TABLE = process.env.CONNECTIONS_TABLE;
 
