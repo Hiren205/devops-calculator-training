@@ -181,7 +181,7 @@ Resources:
               /SUCCEEDED/i.test(message)
             );
           }
-
+              console.log("hello");
           exports.handler = async (event) => {
             const payload = Buffer.from(event.awslogs.data, 'base64');
             const decompressed = zlib.gunzipSync(payload).toString('utf8');
