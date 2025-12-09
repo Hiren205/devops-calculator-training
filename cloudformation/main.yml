@@ -32,7 +32,7 @@ Resources:
   IAMRolesStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://calculator-first-cicd-bucket.s3.us-east-1.amazonaws.com/roles.yml
+      TemplateURL: https://calculator-first-cicd-458284369197.s3.us-east-1.amazonaws.com/roles.yml
 
 
 
@@ -40,14 +40,14 @@ Resources:
     Type: AWS::CloudFormation::Stack
     DependsOn: IAMRolesStack
     Properties:
-      TemplateURL: https://calculator-first-cicd-bucket.s3.us-east-1.amazonaws.com/lambda-deploy.yml
+      TemplateURL: https://calculator-first-cicd-458284369197.s3.us-east-1.amazonaws.com/lambda-deploy.yml
       Parameters:
         ProjectName: !Ref ProjectName
         DeploymentBucket: !Ref DeploymentBucket
   CodeBuildStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://calculator-first-cicd-bucket.s3.us-east-1.amazonaws.com/codebuild.yml
+      TemplateURL: https://calculator-first-cicd-458284369197.s3.us-east-1.amazonaws.com/codebuild.yml
       Parameters:
         ProjectName: !Ref ProjectName
         DeploymentBucket: !Ref DeploymentBucket
@@ -56,7 +56,7 @@ Resources:
   PipelineStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://s3.amazonaws.com/calculator-first-cicd-bucket/pipeline.yml
+      TemplateURL: https://s3.amazonaws.com/calculator-first-cicd-458284369197/pipeline.yml
       Parameters:
         ProjectName: !Ref ProjectName
         GitHubRepo: !Ref GitHubRepo 
