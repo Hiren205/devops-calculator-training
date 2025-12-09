@@ -102,7 +102,10 @@ console.log(ws);
     setTimeout(connect, 3000);
   };
 
-  ws.onerror = (err) => appendLog("⚠️ WS Error: " + err, "error");
+  ws.onerror = (event) => {
+  console.error('WS Error details:', event.code, event.reason, event);
+  appendLog(`⚠️ WS Error: Code ${event.code} - ${event.reason}`, 'error');
+};
 }
 
   function disconnect() {
