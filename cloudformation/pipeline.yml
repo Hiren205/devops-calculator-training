@@ -59,20 +59,6 @@ Resources:
                 - Name: BuildOutput
               Configuration:
                 ProjectName: !Ref CodeBuildProjectName
-        - Name: DeployLambda
-          Actions:
-            - Name: DeployLambdaCode
-              ActionTypeId:
-                Category: Build
-                Owner: AWS
-                Provider: CodeBuild
-                Version: 1
-              RunOrder: 1
-              Configuration:
-                ProjectName: !Sub ${ProjectName}-LambdaDeploy  # CodeBuild project for deployment
-              InputArtifacts:
-                - Name: BuildOutput  # artifact from previous build stage containing lambda.zip
-              RoleArn: !Ref CodeBuildServiceRoleArn
 
 Outputs:
   PipelineName:
