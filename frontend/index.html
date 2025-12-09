@@ -75,9 +75,9 @@
     appendLog("Already connected.", "build");
     return;
   }
-
+console.log("done");
   ws = new WebSocket(WS_URL);
-
+console.log(ws);
   ws.onopen = () => {
     appendLog("🔌 Connected to WebSocket", "build");
     // Optional: send a message after connecting
