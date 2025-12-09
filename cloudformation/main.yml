@@ -16,7 +16,7 @@ Parameters:
     Default: /github-token
   EC2KeyPair:
     Type: String
-    Default: calculator-key-pair
+    Default: keynew
 
 Resources:
   DeploymentBucket:
@@ -126,18 +126,7 @@ Resources:
           yum install -y httpd aws-cli
           systemctl enable httpd
           systemctl start httpd
-          aws s3 cp s3://calculator-static-frontend-file/index.html /var/www/html/index.html
-  ConnectionsTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      TableName: !Sub "${ProjectName}-ws-connections"
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: connectionId
-          AttributeType: S
-      KeySchema:
-        - AttributeName: connectionId
-          KeyType: HASH
+          aws s3 cp s3://calculator-static-frontend-file-458284369197/index.html /var/www/html/index.html
 
 
 Outputs:

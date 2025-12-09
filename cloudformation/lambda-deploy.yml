@@ -17,7 +17,7 @@ Resources:
   ConnectionsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub "${ProjectName}-ws-connections"
+      TableName: !Sub "${ProjectName}-ws-connections-458284369197"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: connectionId
