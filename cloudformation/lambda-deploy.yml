@@ -167,29 +167,35 @@ Resources:
           const zlib = require('zlib');
           const AWS = require('aws-sdk');
           const ddb = new AWS.DynamoDB.DocumentClient();
-           const apiGateway = new AWS.ApiGatewayManagementApi({
-              endpoint: process.env.WS_API_ENDPOINT
-                        });
+          const apiGateway = new AWS.ApiGatewayManagementApi({
+            endpoint: process.env.WS_API_ENDPOINT
+          });
 
           const TABLE = process.env.CONNECTIONS_TABLE;
 
+          // Only forward important CodeBuild progress logs
+          function isImportantLog(message) {
+            return (
+              /Phase complete/i.test(message) ||
+              /FAILED/i.test(message) ||
+              /SUCCEEDED/i.test(message)
+            );
+          }
+
           exports.handler = async (event) => {
-            // CloudWatch Logs subscription delivers base64 gzipped data in 'awslogs' property
             const payload = Buffer.from(event.awslogs.data, 'base64');
             const decompressed = zlib.gunzipSync(payload).toString('utf8');
             const parsed = JSON.parse(decompressed);
             const events = parsed.logEvents || [];
 
-            // Build a simple broadcast message (you can extend this)
             for (const ev of events) {
+              if (!isImportantLog(ev.message)) continue; // Skip noisy logs
+
               const message = {
-                timestamp: parsed.logGroup ? parsed.logGroup : null,
-                id: ev.id,
-                message: ev.message
+                message: ev.message.trim()
               };
 
-              // Scan all connections and push (broadcast)
-              let startKey = undefined;
+              let startKey;
               do {
                 const res = await ddb.scan({
                   TableName: TABLE,
@@ -205,7 +211,6 @@ Resources:
                       Data: JSON.stringify(message)
                     }).promise();
                   } catch (err) {
-                    // If connection is stale (410), remove from table
                     if (err.statusCode === 410) {
                       await ddb.delete({
                         TableName: TABLE,
