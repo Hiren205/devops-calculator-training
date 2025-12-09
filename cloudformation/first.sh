@@ -35,6 +35,6 @@ WS_URL=$(aws cloudformation describe-stacks \
  echo "WebSocket URL from CloudFormation: $WS_URL"
 
 # Replace placeholder in index.html locally
-sed -i "s|wss://<api-id>.execute-api.<region>.amazonaws.com/dev|$WS_URL|g" frontend/index.html
+sed -i "s|wss://<api-id>.execute-api.<region>.amazonaws.com/dev|$WS_URL|g" ../frontend/index.html
 
-aws s3 cp frontend/index.html s3://calculator-static-frontend-file-458284369197/index.html
+aws s3 cp ../frontend/index.html s3://calculator-static-frontend-file-458284369197/index.html
