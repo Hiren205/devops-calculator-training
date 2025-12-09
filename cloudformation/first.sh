@@ -13,15 +13,15 @@ done
  
 #Now deploy the main stack
 
-# aws cloudformation create-stack \
-#   --stack-name main-stack \
-#   --template-body file://main.yml \
-#   --capabilities CAPABILITY_NAMED_IAM
-
-aws cloudformation update-stack \
+aws cloudformation create-stack \
   --stack-name main-stack \
   --template-body file://main.yml \
   --capabilities CAPABILITY_NAMED_IAM
+
+# aws cloudformation update-stack \
+#   --stack-name main-stack \
+#   --template-body file://main.yml \
+#   --capabilities CAPABILITY_NAMED_IAM
   
 
 aws cloudformation wait stack-update-complete \
