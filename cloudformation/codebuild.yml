@@ -8,13 +8,42 @@ Parameters:
     Type: String
   CodeBuildServiceRoleArn:
     Type: String
+  LogProcessorLambdaArn:
+    Type: String
 
 Resources:
+  LambdaBuild:
+    Type: "AWS::Logs::LogGroup"
+    Properties:
+      RetentionInDays: 365
+      LogGroupName: !Sub "code-build-lambda"
+  LamdaDeploy:
+    Type: "AWS::Logs::LogGroup"
+    Properties:
+      RetentionInDays: 365
+      LogGroupName: !Sub "code-deploy-lambda"
+  LambdaBuildSubscription:
+    Type: AWS::Logs::SubscriptionFilter
+    Properties:
+      DestinationArn: !Ref LogProcessorLambdaArn
+      FilterPattern: ""
+      LogGroupName: !Ref LambdaBuild
+
+  LambdaDeploySubscription:
+    Type: AWS::Logs::SubscriptionFilter
+    Properties:
+      DestinationArn: !Ref LogProcessorLambdaArn
+      FilterPattern: ""
+      LogGroupName: !Ref LamdaDeploy
   CodeBuildProject:
     Type: AWS::CodeBuild::Project
     Properties:
       Name: !Sub "${ProjectName}-Lambda-Build"
       ServiceRole: !Ref CodeBuildServiceRoleArn
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: !Ref LambdaBuild
+          Status: "ENABLED"
       Artifacts:
         Type: CODEPIPELINE
       Environment:
@@ -31,6 +60,10 @@ Resources:
     Properties:
       Name: !Sub "${ProjectName}-LambdaDeploy"
       Description: "CodeBuild project to deploy Lambda function"
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: !Ref LamdaDeploy
+          Status: "ENABLED"
       Source:
         Type: CODEPIPELINE
         BuildSpec: |

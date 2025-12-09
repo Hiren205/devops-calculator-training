@@ -1,8 +1,9 @@
 #!/bin/bash
-
-BUCKET=calculator-first-cicd-bucket
+set -e  # stop on first error
+BUCKET=calculator-first-cicd-458284369197
  
 # Upload all child templates
+echo "Using bucket: $BUCKET"
 
 for file in roles.yml codebuild.yml lambda-deploy.yml pipeline.yml; do
 
@@ -21,3 +22,17 @@ aws cloudformation update-stack \
   --stack-name main-stack \
   --template-body file://main.yml \
   --capabilities CAPABILITY_NAMED_IAM
+  
+
+aws cloudformation wait stack-update-complete \
+  --stack-name main-stack
+
+
+WS_URL=$(aws cloudformation describe-stacks \
+ --stack-name main-stack \
+ --query "Stacks[0].Outputs[?OutputKey=='WebSocketUrl'].OutputValue" \
+ --output text)
+# Replace placeholder in index.html locally
+sed -i "s|wss://<api-id>.execute-api.<region>.amazonaws.com/dev|$WS_URL|g" index.html
+
+aws s3 cp index.html s3://calculator-static-frontend-file/index.html

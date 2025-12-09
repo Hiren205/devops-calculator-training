@@ -10,8 +10,21 @@ Parameters:
     Type: String
     Description: S3 bucket where CodeBuild uploads lambda.zip
     Default: "deployment-bucket"
-
+  StageName:
+    Type: String
+    Default: dev
 Resources:
+  ConnectionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${ProjectName}-ws-connections"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: connectionId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: connectionId
+          KeyType: HASH
   LambdaExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -27,52 +40,45 @@ Resources:
               - sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: RealtimePushPermissions
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # Allow scanning the connections table
+              - Effect: Allow
+                Action:
+                  - dynamodb:Scan
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:DeleteItem
+                Resource: !GetAtt ConnectionsTable.Arn
+              # Allow writing to CloudWatch logs (Lambda will have CloudWatch Basic via managed policy)
+              - Effect: Allow
+                Action:
+                  - execute-api:ManageConnections
+                Resource: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:*/*/*"
 
-  MyLambdaFunction:
-    Type: AWS::Lambda::Function
+
+  ### WebSocket API (API Gateway v2) ###
+  WebSocketApi:
+    Type: AWS::ApiGatewayV2::Api
     Properties:
-      FunctionName: !Sub "${ProjectName}-Lambda"
-      Handler: app.handler
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Runtime: nodejs22.x
-      Code:
-        ZipFile: |
-          exports.handler = async (event) => {
-              return {
-                  statusCode: 200,
-                  body: "Hello World!"
-              };
-          };
-
-  # === API Gateway Setup ===
-  ApiGatewayRestApi:
-    Type: AWS::ApiGateway::RestApi
+      Name: !Sub "${ProjectName}-realtime-ws"
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: "$request.body.action"
+  ConnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
     Properties:
-      Name: !Sub "${ProjectName}-Api"
-      Description: API Gateway for Lambda function
-
-  ApiGatewayResource:
-    Type: AWS::ApiGateway::Resource
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ConnectHandler.Arn}/invocations"
+  DisconnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
     Properties:
-      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
-      PathPart: "lambda"
-      RestApiId: !Ref ApiGatewayRestApi
-
-  ApiGatewayMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref ApiGatewayRestApi
-      ResourceId: !Ref ApiGatewayResource
-      HttpMethod: GET
-      AuthorizationType: NONE
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri:
-          Fn::Sub:
-            - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
-            - { LambdaArn: !GetAtt MyLambdaFunction.Arn }
-
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ConnectHandler.Arn}/invocations"
   LambdaApiPermission:
     Type: AWS::Lambda::Permission
     Properties:
@@ -80,23 +86,156 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/*"
-
-  ApiGatewayDeployment:
-    Type: AWS::ApiGateway::Deployment
-    DependsOn: ApiGatewayMethod
+  ConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
     Properties:
-      RestApiId: !Ref ApiGatewayRestApi
-      StageName: prod
+      ApiId: !Ref WebSocketApi
+      RouteKey: $connect
+      AuthorizationType: NONE
+      Target: !Sub "integrations/${ConnectIntegration}"
+  DisconnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: $disconnect
+      AuthorizationType: NONE
+      Target: !Sub "integrations/${DisconnectIntegration}"
+  ### Deployment & Stage ###
+  WebSocketDeployment:
+    Type: AWS::ApiGatewayV2::Deployment
+    Properties:
+      ApiId: !Ref WebSocketApi
+    DependsOn:
+      - ConnectRoute
+      - DisconnectRoute
+  ConnectHandler:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-ws-connection-handler"
+      Handler: index.handler
+      Runtime: nodejs20.x
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          CONNECTIONS_TABLE: !Ref ConnectionsTable
+          WS_API_ENDPOINT: !Sub "${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}"
+      Code:
+        ZipFile: |
+          const AWS = require('aws-sdk');
+          const ddb = new AWS.DynamoDB.DocumentClient();
+          const TABLE = process.env.CONNECTIONS_TABLE;
+          exports.handler = async (event) => {
+            const route = event.requestContext.routeKey;
+            const connectionId = event.requestContext.connectionId;
+            if (route === '$connect') {
+              await ddb.put({
+                TableName: TABLE,
+                Item: { connectionId }
+              }).promise();
+              return { statusCode: 200, body: 'connected' };
+            } else if (route === '$disconnect') {
+              await ddb.delete({
+                TableName: TABLE,
+                Key: { connectionId }
+              }).promise();
+              return { statusCode: 200, body: 'disconnected' };
+            }
+            return { statusCode: 200 };
+          };
+  LambdaPermissionForAPIGW:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ConnectHandler
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/$connect"
+  LogProcessorLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-log-processor"
+      Handler: index.handler
+      Runtime: nodejs20.x
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      Environment:
+        Variables:
+          CONNECTIONS_TABLE: !Ref ConnectionsTable
+          WS_API_ENDPOINT: !Sub "https://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}"
+      Code:
+        ZipFile: |
+          const zlib = require('zlib');
+          const AWS = require('aws-sdk');
+          const ddb = new AWS.DynamoDB.DocumentClient();
+          const apiGateway = new AWS.ApiGatewayManagementApi({
+            endpoint: process.env.WS_API_ENDPOINT.replace(/^https?:\/\//, '')
+          });
+          const TABLE = process.env.CONNECTIONS_TABLE;
 
+          exports.handler = async (event) => {
+            // CloudWatch Logs subscription delivers base64 gzipped data in 'awslogs' property
+            const payload = Buffer.from(event.awslogs.data, 'base64');
+            const decompressed = zlib.gunzipSync(payload).toString('utf8');
+            const parsed = JSON.parse(decompressed);
+            const events = parsed.logEvents || [];
+
+            // Build a simple broadcast message (you can extend this)
+            for (const ev of events) {
+              const message = {
+                timestamp: parsed.logGroup ? parsed.logGroup : null,
+                id: ev.id,
+                message: ev.message
+              };
+
+              // Scan all connections and push (broadcast)
+              let startKey = undefined;
+              do {
+                const res = await ddb.scan({
+                  TableName: TABLE,
+                  ExclusiveStartKey: startKey,
+                  ProjectionExpression: "connectionId"
+                }).promise();
+                startKey = res.LastEvaluatedKey;
+
+                const posts = res.Items.map(async (item) => {
+                  try {
+                    await apiGateway.postToConnection({
+                      ConnectionId: item.connectionId,
+                      Data: JSON.stringify(message)
+                    }).promise();
+                  } catch (err) {
+                    // If connection is stale (410), remove from table
+                    if (err.statusCode === 410) {
+                      await ddb.delete({
+                        TableName: TABLE,
+                        Key: { connectionId: item.connectionId }
+                      }).promise();
+                    }
+                  }
+                });
+
+                await Promise.all(posts);
+              } while (startKey);
+            }
+
+            return { statusCode: 200 };
+          };
+  PermissionForLogsToInvokeLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref LogProcessorLambda
+      Action: lambda:InvokeFunction
+      Principal: logs.amazonaws.com
 Outputs:
-  LambdaFunctionName:
-    Description: Name of the deployed Lambda function
-    Value: !Ref MyLambdaFunction
+  WebSocketUrl:
+    Description: WebSocket URL to use in the frontend (use wss://)
+    Value: !Sub "wss://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}"
 
-  LambdaFunctionArn:
-    Description: ARN of the deployed Lambda function
-    Value: !GetAtt MyLambdaFunction.Arn
+  ConnectionsTableName:
+    Description: DynamoDB table that stores connections
+    Value: !Ref ConnectionsTable
 
-  ApiGatewayInvokeUrl:
-    Description: Invoke URL of API Gateway
-    Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/prod/lambda"
+  LogProcessorLambdaArn:
+    Description: Lambda processing CloudWatch Logs and broadcasting
+    Value: !GetAtt LogProcessorLambda.Arn
+    Export:
+      Name: !Sub "${ProjectName}-LogProcessorLambdaArn"

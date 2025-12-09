@@ -34,14 +34,7 @@ Resources:
     Properties:
       TemplateURL: https://calculator-first-cicd-bucket.s3.us-east-1.amazonaws.com/roles.yml
 
-  CodeBuildStack:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: https://calculator-first-cicd-bucket.s3.us-east-1.amazonaws.com/codebuild.yml
-      Parameters:
-        ProjectName: !Ref ProjectName
-        DeploymentBucket: !Ref DeploymentBucket
-        CodeBuildServiceRoleArn: !GetAtt IAMRolesStack.Outputs.CodeBuildServiceRoleArn
+
 
   LambdaStack:
     Type: AWS::CloudFormation::Stack
@@ -51,7 +44,15 @@ Resources:
       Parameters:
         ProjectName: !Ref ProjectName
         DeploymentBucket: !Ref DeploymentBucket
-
+  CodeBuildStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://calculator-first-cicd-bucket.s3.us-east-1.amazonaws.com/codebuild.yml
+      Parameters:
+        ProjectName: !Ref ProjectName
+        DeploymentBucket: !Ref DeploymentBucket
+        CodeBuildServiceRoleArn: !GetAtt IAMRolesStack.Outputs.CodeBuildServiceRoleArn
+        LogProcessorLambdaArn: !GetAtt LambdaStack.Outputs.LogProcessorLambdaArn
   PipelineStack:
     Type: AWS::CloudFormation::Stack
     Properties:
@@ -126,6 +127,18 @@ Resources:
           systemctl enable httpd
           systemctl start httpd
           aws s3 cp s3://calculator-static-frontend-file/index.html /var/www/html/index.html
+  ConnectionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${ProjectName}-ws-connections"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: connectionId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: connectionId
+          KeyType: HASH
+
 
 Outputs:
   InstancePublicIP:
@@ -139,3 +152,7 @@ Outputs:
   KeyPairName:
     Description: EC2 KeyPair Name (download PEM separately from AWS Console/CLI)
     Value: !Ref EC2KeyPair
+
+  WebSocketUrl:
+    Description: "WebSocket URL from nested stack"
+    Value: !GetAtt LambdaStack.Outputs.WebSocketUrl

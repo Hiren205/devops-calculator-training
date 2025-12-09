@@ -1,17 +1,116 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Letter Calculator</title>
+<meta charset="UTF-8">
+<title>CI/CD Live Logs</title>
+<style>
+  body {
+    font-family: monospace;
+    background: #111;
+    color: #eee;
+    margin: 0;
+  }
+  #header {
+    padding: 10px;
+    background: #222;
+    font-size: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  #logs {
+    height: calc(100vh - 70px);
+    overflow-y: auto;
+    padding: 10px;
+    white-space: pre-wrap;
+  }
+  .log-entry {
+    margin: 2px 0;
+  }
+  .build { color: #4caf50; }
+  .deploy { color: #ffd700; }
+  .error { color: #ff4d4d; }
+  button {
+    background: #0084ff;
+    color: #fff;
+    border: none;
+    padding: 6px 12px;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+  button:hover {
+    opacity: 0.8;
+  }
+</style>
 </head>
 <body>
-  <!-- Point action to your Lambda/API Gateway URL -->
-  <form action="https://7u7j3cq9yd.execute-api.us-east-1.amazonaws.com/prod/lambda" method="get">
-    <label for="word">Enter text:</label>
-    <!-- name must be "word" so it maps to queryStringParameters.word -->
-    <input type="text" id="word" name="word" />
-    <button type="submit">Submit Button</button>
-  </form>
+
+<div id="header">
+  <div>🚀 Live Pipeline Logs</div>
+  <div>
+    <button onclick="connect()">Connect</button>
+    <button onclick="disconnect()">Disconnect</button>
+  </div>
+</div>
+
+<div id="logs"></div>
+
+<script>
+  const WS_URL = "wss://<api-id>.execute-api.<region>.amazonaws.com/dev"; // 👈 UPDATE THIS
+  const PIPELINE_NAME = "calculator-Pipeline"; // used to filter if needed
+
+  let ws;
+
+  function appendLog(message, type = "") {
+    const logs = document.getElementById("logs");
+    const entry = document.createElement("div");
+    entry.classList.add("log-entry", type);
+    entry.textContent = message;
+    logs.appendChild(entry);
+    logs.scrollTop = logs.scrollHeight;
+  }
+
+  function connect() {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      appendLog("Already connected.", "build");
+      return;
+    }
+
+    ws = new WebSocket(WS_URL);
+
+    ws.onopen = () => appendLog("🔌 Connected to WebSocket", "build");
+
+    ws.onmessage = (event) => {
+      const payload = JSON.parse(event.data);
+      const msg = payload.message || JSON.stringify(payload);
+      const timestamp = new Date().toLocaleTimeString();
+
+      let type = "";
+      if (msg.toLowerCase().includes("error")) type = "error";
+      else if (msg.toLowerCase().includes("deploy")) type = "deploy";
+      else type = "build";
+
+      appendLog(`[${timestamp}] ${msg}`, type);
+    };
+
+    ws.onclose = () => {
+      appendLog("❌ Disconnected. Reconnecting in 3s...", "error");
+      setTimeout(connect, 3000);
+    };
+
+    ws.onerror = (err) => appendLog("⚠️ WS Error: " + err, "error");
+  }
+
+  function disconnect() {
+    if (ws) {
+      ws.close();
+      appendLog("🚪 Disconnected by user", "error");
+    }
+  }
+
+  // Auto connect on load
+  connect();
+</script>
+
 </body>
 </html>
-
