@@ -148,6 +148,19 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/$connect"
+  FixWebSocketPolicy:
+    Type: AWS::ApiGateway::ResourcePolicy
+    Properties:
+      Resource:
+        - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:uz47a6zc2d/*"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: "*"
+            Action: execute-api:Invoke
+            Resource:
+              - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:uz47a6zc2d/*"
   LogProcessorLambda:
     Type: AWS::Lambda::Function
     Properties:
