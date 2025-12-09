@@ -27,7 +27,7 @@ Resources:
   FrontendBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub "${ProjectName}-static-frontend-file"      
+      BucketName: !Sub "${ProjectName}-static-frontend-file-${AWS::AccountId}"      
 
   IAMRolesStack:
     Type: AWS::CloudFormation::Stack
