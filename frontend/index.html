@@ -71,35 +71,39 @@
   }
 
   function connect() {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      appendLog("Already connected.", "build");
-      return;
-    }
-
-    ws = new WebSocket(WS_URL);
-
-    ws.onopen = () => appendLog("🔌 Connected to WebSocket", "build");
-
-    ws.onmessage = (event) => {
-      const payload = JSON.parse(event.data);
-      const msg = payload.message || JSON.stringify(payload);
-      const timestamp = new Date().toLocaleTimeString();
-
-      let type = "";
-      if (msg.toLowerCase().includes("error")) type = "error";
-      else if (msg.toLowerCase().includes("deploy")) type = "deploy";
-      else type = "build";
-
-      appendLog(`[${timestamp}] ${msg}`, type);
-    };
-
-    ws.onclose = () => {
-      appendLog("❌ Disconnected. Reconnecting in 3s...", "error");
-      setTimeout(connect, 3000);
-    };
-
-    ws.onerror = (err) => appendLog("⚠️ WS Error: " + err, "error");
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    appendLog("Already connected.", "build");
+    return;
   }
+
+  ws = new WebSocket(WS_URL);
+
+  ws.onopen = () => {
+    appendLog("🔌 Connected to WebSocket", "build");
+    // Optional: send a message after connecting
+    // ws.send(JSON.stringify({ message: "Hello server!" }));
+  };
+
+  ws.onmessage = (event) => {
+    const payload = JSON.parse(event.data);
+    const msg = payload.message || JSON.stringify(payload);
+    const timestamp = new Date().toLocaleTimeString();
+
+    let type = "";
+    if (msg.toLowerCase().includes("error")) type = "error";
+    else if (msg.toLowerCase().includes("deploy")) type = "deploy";
+    else type = "build";
+
+    appendLog(`[${timestamp}] ${msg}`, type);
+  };
+
+  ws.onclose = () => {
+    appendLog("❌ Disconnected. Reconnecting in 3s...", "error");
+    setTimeout(connect, 3000);
+  };
+
+  ws.onerror = (err) => appendLog("⚠️ WS Error: " + err, "error");
+}
 
   function disconnect() {
     if (ws) {
