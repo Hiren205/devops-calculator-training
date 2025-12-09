@@ -72,7 +72,7 @@ Resources:
     Properties:
       FunctionName: !Sub "${ProjectName}-ws-connection-handler"
       Handler: index.handler
-      Runtime: nodejs20.x
+      Runtime: nodejs16.x
       Role: !GetAtt LambdaExecutionRole.Arn
       Environment:
         Variables:
@@ -155,7 +155,7 @@ Resources:
     Properties:
       FunctionName: !Sub "${ProjectName}-log-processor"
       Handler: index.handler
-      Runtime: nodejs20.x
+      Runtime: nodejs16.x
       Role: !GetAtt LambdaExecutionRole.Arn
       Timeout: 30
       Environment:
