@@ -168,31 +168,38 @@ Resources:
           const AWS = require('aws-sdk');
           const ddb = new AWS.DynamoDB.DocumentClient();
           const apiGateway = new AWS.ApiGatewayManagementApi({
-            endpoint: process.env.WS_API_ENDPOINT
+            endpoint: process.env.WS_API_ENDPOINT.replace(/^https?:\/\//, '')
           });
 
           const TABLE = process.env.CONNECTIONS_TABLE;
 
           // Only forward important CodeBuild progress logs
-          function isImportantLog(message) {
-            return (
-              /Phase complete/i.test(message) ||
-              /FAILED/i.test(message) ||
-              /SUCCEEDED/i.test(message)
-            );
-          }
-              console.log("hello");
+          const IMPORTANT_REGEX = /(Phase complete|State:|FAILED|ERROR|SUCCEEDED)/i;
+
           exports.handler = async (event) => {
             const payload = Buffer.from(event.awslogs.data, 'base64');
             const decompressed = zlib.gunzipSync(payload).toString('utf8');
             const parsed = JSON.parse(decompressed);
             const events = parsed.logEvents || [];
+            
+            const logGroup = parsed.logGroup;
+            const buildName = logGroup?.split("/").pop() || "unknown-build";
+
+            // A) Optional: Only for specific build name
+            // if (!logGroup.includes("Frontend-Build")) return;
 
             for (const ev of events) {
-              if (!isImportantLog(ev.message)) continue; // Skip noisy logs
+              if (!IMPORTANT_REGEX.test(ev.message)) continue; // Filter noise
+
+              let cleanLine = ev.message.trim();
+
+              // Highlight success/error
+              if (/FAILED/i.test(cleanLine)) cleanLine = `❌ ${cleanLine}`;
+              if (/SUCCEEDED/i.test(cleanLine)) cleanLine = `✔️ ${cleanLine}`;
 
               const message = {
-                message: ev.message.trim()
+                build: buildName,
+                log: `[${buildName}] ${cleanLine}`
               };
 
               let startKey;
@@ -204,17 +211,17 @@ Resources:
                 }).promise();
                 startKey = res.LastEvaluatedKey;
 
-                const posts = res.Items.map(async (item) => {
+                const posts = res.Items.map(async ({ connectionId }) => {
                   try {
                     await apiGateway.postToConnection({
-                      ConnectionId: item.connectionId,
+                      ConnectionId: connectionId,
                       Data: JSON.stringify(message)
                     }).promise();
                   } catch (err) {
                     if (err.statusCode === 410) {
                       await ddb.delete({
                         TableName: TABLE,
-                        Key: { connectionId: item.connectionId }
+                        Key: { connectionId }
                       }).promise();
                     }
                   }
@@ -226,6 +233,7 @@ Resources:
 
             return { statusCode: 200 };
           };
+
   PermissionForLogsToInvokeLambda:
     Type: AWS::Lambda::Permission
     Properties:
